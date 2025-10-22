@@ -43,20 +43,31 @@ def create_room(payload: RoomCreate):
 
     verify_user_exists(payload.host_id)
 
+    for room in rooms.values():
+        if payload.host_id in room.players:
+            raise HTTPException(status_code=400, detail="User is already in another room")
+
     with lock:
         room_id = str(uuid4())
         room = Room(id=room_id, name=payload.name, players=[payload.host_id], status="waiting")
         rooms[room_id] = room
     return room
 
-@app.get("/rooms", response_model=List[Room])
+@app.get("/rooms")
 def list_rooms():
-    return list(rooms.values())
+    room_list = list(rooms.values())
+    if not room_list:
+        return {"message": "No rooms for now"}
+    return room_list
 
 @app.post("/rooms/{room_id}/join/{user_id}", response_model=Room)
 def join_room(room_id: str, user_id: str):
     
     verify_user_exists(user_id)
+
+    for r in rooms.values():
+            if user_id in r.players:
+                raise HTTPException(status_code=400, detail="User is already in another room")
 
     room = rooms.get(room_id)
     if not room:
