@@ -74,6 +74,17 @@ def join_room(room_id: str, user_id: str):
     room.status = "full" if len(room.players) == 2 else "waiting"
     return room
 
+@app.post("/rooms/{room_id}/reset", response_model=Room)
+def reset_room(room_id: str):
+    """Reinicia la sala para una nueva partida."""
+    room = rooms.get(room_id)
+    if not room:
+        raise HTTPException(status_code=404, detail="Room not found")
+
+    room.players = []      # vacía la lista de jugadores
+    room.status = "waiting"
+    return room
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
