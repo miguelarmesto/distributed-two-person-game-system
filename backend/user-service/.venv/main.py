@@ -29,10 +29,12 @@ def create_user(payload: UserCreate):
         users[user_id] = user
     return user
 
-@app.get("/users", response_model=List[User])
+@app.get("/users")
 def list_users():
-    
-    return list(users.values())
+    user_list = list(users.values())
+    if not user_list:
+        return {"message": "No users for now"}
+    return user_list
 
 @app.get("/users/{user_id}", response_model=User)
 def get_user(user_id: str):
