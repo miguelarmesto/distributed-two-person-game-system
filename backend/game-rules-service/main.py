@@ -195,6 +195,23 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, player_id: str)
             pass
 
 
+@app.get("/games/{room_id}")
+def get_game_state(room_id: str):
+    """
+    Returns the current state of a Tic-Tac-Toe game by room_id.
+    Useful for debugging or external services (e.g., a scoreboard).
+    """
+    game = games.get(room_id)
+    if not game:
+        raise HTTPException(status_code=404, detail="Game not found")
+
+    return {
+        "board": game["board"],
+        "players": game["players"],
+        "turn": game["turn"],
+        "mark_map": game["mark_map"],
+    }
+
 async def handle_move(room_id: str, player_id: str, index: int):
     """
     Handle a move requested by player_id at `index` (0-8).
