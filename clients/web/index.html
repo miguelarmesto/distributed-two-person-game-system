@@ -1,0 +1,90 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Tic-Tac-Toe WebSocket Client</title>
+  <style>
+    /* minimal styling */
+    #board { display: grid; grid-template-columns: repeat(3, 80px); gap: 10px; }
+    .cell { width:80px; height:80px; display:flex; align-items:center; justify-content:center; font-size:32px; border:1px solid #333; cursor:pointer; }
+    #log { white-space: pre-wrap; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <h1>Tic-Tac-Toe (WebSocket)</h1>
+
+  <label>Room ID: <input id="room" value="PUT_ROOM_ID_HERE"/></label>
+  <label>Player ID: <input id="player" value="PUT_PLAYER_ID_HERE"/></label>
+  <button id="connect">Connect</button>
+
+  <div id="status"></div>
+  <div id="board"></div>
+  <div id="log"></div>
+
+<script>
+  let socket = null;
+  let board = ["","","","","","","","",""];
+  let myPlayer = null;
+  let myMark = null;
+  let currentTurn = null;
+
+  const boardEl = document.getElementById("board");
+  const statusEl = document.getElementById("status");
+  const logEl = document.getElementById("log");
+
+  function renderBoard() {
+    boardEl.innerHTML = "";
+    board.forEach((v, i) => {
+      const cell = document.createElement("div");
+      cell.className = "cell";
+      cell.textContent = v;
+      cell.onclick = () => {
+        if (!socket) return;
+        socket.send(JSON.stringify({action:"move", index: i}));
+        appendLog("Sent move " + i);
+      };
+      boardEl.appendChild(cell);
+    });
+  }
+
+  function appendLog(msg) {
+    logEl.textContent += msg + "\n";
+  }
+
+  document.getElementById("connect").onclick = () => {
+    const ROOM_ID = document.getElementById("room").value.trim();
+    const PLAYER_ID = document.getElementById("player").value.trim();
+    if (!ROOM_ID || !PLAYER_ID) { alert("Set room and player ids"); return; }
+    myPlayer = PLAYER_ID;
+    socket = new WebSocket(`ws://127.0.0.1:8003/ws/${ROOM_ID}/${PLAYER_ID}`);
+
+    socket.onopen = () => {
+      statusEl.textContent = "Connected";
+      appendLog("Connected to game service");
+    };
+    socket.onmessage = (ev) => {
+      let data = JSON.parse(ev.data);
+      if (data.type === "state") {
+        board = data.board;
+        currentTurn = data.turn;
+        if (data.mark_map && data.mark_map[myPlayer]) myMark = data.mark_map[myPlayer];
+        renderBoard();
+        appendLog("STATE: " + data.message + " | Turn: " + data.turn);
+      } else if (data.type === "info") {
+        appendLog("INFO: " + data.message);
+      } else if (data.type === "error") {
+        appendLog("ERROR: " + data.message);
+      } else {
+        appendLog("MSG: " + JSON.stringify(data));
+      }
+    };
+    socket.onclose = () => {
+      statusEl.textContent = "Disconnected";
+      appendLog("Disconnected");
+    };
+  };
+
+  renderBoard();
+</script>
+</body>
+</html>
