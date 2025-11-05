@@ -195,3 +195,72 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, player_id: str)
             pass
 
 
+async def handle_move(room_id: str, player_id: str, index: int):
+    """
+    Handle a move requested by player_id at `index` (0-8).
+    Validate turn, index range, and occupancy.
+    Update board, check winner/draw, broadcast new state.
+    """
+    if room_id not in games:
+        return
+    game = games[room_id]
+    async with game["lock"]:
+        # validate player part of the game
+        if player_id not in game["players"]:
+            ws = game["sockets"].get(player_id)
+            if ws:
+                await ws.send_text(json.dumps({"type":"error","message":"You are not a player in this game"}))
+            return
+
+        # validate it's player's turn
+        if game["turn"] != player_id:
+            ws = game["sockets"].get(player_id)
+            if ws:
+                await ws.send_text(json.dumps({"type":"error","message":"Not your turn"}))
+            return
+
+        # validate index
+        if not isinstance(index, int) or index < 0 or index > 8:
+            await game["sockets"][player_id].send_text(json.dumps({"type":"error","message":"Invalid index"}))
+            return
+
+        if game["board"][index] != "":
+            await game["sockets"][player_id].send_text(json.dumps({"type":"error","message":"Cell already occupied"}))
+            return
+
+        # perform move
+        mark = game["mark_map"].get(player_id)
+        game["board"][index] = mark
+
+        # check winner or draw
+        result = check_winner(game["board"])
+        if result == "X" or result == "O":
+            # find which player_id corresponds to this mark
+            winner_id = None
+            for pid, m in game["mark_map"].items():
+                if m == result:
+                    winner_id = pid
+            # broadcast final state with winner
+            await broadcast_state(room_id, f"Player {winner_id} ({result}) wins!", winner=winner_id)
+            # reset board for next game
+            await reset_game_state(room_id)
+            # optionally notify Room Service to reset the room
+            try:
+                requests.post(f"{ROOM_SERVICE_URL}/rooms/{room_id}/reset", timeout=2)
+            except requests.RequestException:
+                pass
+            return
+        elif result == "draw":
+            await broadcast_state(room_id, "Draw!", winner="draw")
+            await reset_game_state(room_id)
+            try:
+                requests.post(f"{ROOM_SERVICE_URL}/rooms/{room_id}/reset", timeout=2)
+            except requests.RequestException:
+                pass
+            return
+        else:
+            # switch turn to the other player
+            other = [p for p in game["players"] if p != player_id]
+            next_player = other[0] if other else None
+            game["turn"] = next_player
+            await broadcast_state(room_id, f"Player {player_id} moved. Next: {next_player}")
