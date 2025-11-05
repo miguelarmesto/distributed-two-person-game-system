@@ -264,3 +264,59 @@ async def handle_move(room_id: str, player_id: str, index: int):
             next_player = other[0] if other else None
             game["turn"] = next_player
             await broadcast_state(room_id, f"Player {player_id} moved. Next: {next_player}")
+
+
+async def broadcast_state(room_id: str, message: str, winner: Optional[str]=None):
+    """
+    Broadcast current game state to all connected sockets in the room.
+    """
+    game = games.get(room_id)
+    if not game:
+        return
+
+    payload = {
+        "type": "state",
+        "message": message,
+        "board": game["board"],
+        "players": game["players"],
+        "turn": game["turn"],
+        "mark_map": game["mark_map"],
+        "winner": winner
+    }
+
+    # send to all connected sockets
+    for pid, ws in list(game["sockets"].items()):
+        try:
+            await ws.send_text(json.dumps(payload))
+        except Exception:
+            # ignore send errors (client disconnected)
+            pass
+
+async def notify_remaining_on_disconnect(room_id: str, disconnected_player: str):
+    """
+    Notify remaining player that opponent disconnected.
+    """
+    game = games.get(room_id)
+    if not game:
+        return
+    for pid, ws in list(game["sockets"].items()):
+        if pid != disconnected_player:
+            try:
+                await ws.send_text(json.dumps({"type":"info","message":f"Opponent {disconnected_player} disconnected."}))
+            except:
+                pass
+
+async def reset_game_state(room_id: str):
+    """
+    Reset the in-memory board for a new match while keeping the same players.
+    Turn resets to the first player in list if available.
+    """
+    game = games.get(room_id)
+    if not game:
+        return
+    game["board"] = [""] * 9
+    if game["players"]:
+        game["turn"] = game["players"][0]
+    else:
+        game["turn"] = None
+    # keep mark_map as is (X/O assignment remains)
