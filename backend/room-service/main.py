@@ -25,6 +25,7 @@ lock = threading.Lock()
 
 
 USER_SERVICE_URL = "http://127.0.0.1:8001"
+GAME_RULES_SERVICE_URL = "http://127.0.0.1:8003"  
 
 def verify_user_exists(user_id: str):
 
@@ -85,13 +86,20 @@ def join_room(room_id: str, user_id: str):
 
 @app.post("/rooms/{room_id}/reset", response_model=Room)
 def reset_room(room_id: str):
-    
+    """Reset room state and notify Game Rules Service to clear game state as well."""
     room = rooms.get(room_id)
     if not room:
         raise HTTPException(status_code=404, detail="Room not found")
 
-    room.players = []      
+
+    room.players = []
     room.status = "waiting"
+
+    try:
+        requests.delete(f"{GAME_RULES_SERVICE_URL}/games/{room_id}", timeout=2)
+    except requests.RequestException:
+        pass
+
     return room
 
 @app.get("/health")
