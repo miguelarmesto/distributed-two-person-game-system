@@ -239,20 +239,16 @@ async def handle_move(room_id: str, player_id: str, index: int):
 
             await broadcast_state(room_id, f"Player {winner_id} ({result}) wins!", winner=winner_id)
 
+
             await reset_game_state(room_id)
 
-            try:
-                requests.post(f"{ROOM_SERVICE_URL}/rooms/{room_id}/reset", timeout=2)
-            except requests.RequestException:
-                pass
+
             return
+
         elif result == "draw":
             await broadcast_state(room_id, "Draw!", winner="draw")
+
             await reset_game_state(room_id)
-            try:
-                requests.post(f"{ROOM_SERVICE_URL}/rooms/{room_id}/reset", timeout=2)
-            except requests.RequestException:
-                pass
             return
         else:
 
