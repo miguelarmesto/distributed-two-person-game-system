@@ -1,17 +1,15 @@
-# clients/cli/main.py
+
 import json
 import threading
 import time
 
 from websocket import WebSocketApp
 
-# ------------- Configuration -------------
+
 
 GAME_RULES_WS_BASE_URL = "ws://127.0.0.1:8003/ws"
 
-# ------------- Global state -------------
 
-# These globals store the latest game state received from the server
 current_board = [""] * 9
 current_turn = None
 current_players = []
@@ -71,7 +69,7 @@ def print_state_message(message):
 def on_open(ws):
     global socket_connected
     socket_connected = True
-    print("\n[INFO] Connected to Game Rules Service.")
+    print("\n Connected to Game Rules Service.")
 
 
 def on_message(ws, message):
@@ -80,7 +78,7 @@ def on_message(ws, message):
     try:
         data = json.loads(message)
     except json.JSONDecodeError:
-        print("[ERROR] Received invalid JSON: {}".format(message))
+        print(" ERROR Received invalid JSON: {}".format(message))
         return
 
     msg_type = data.get("type")
@@ -97,17 +95,17 @@ def on_message(ws, message):
         print_state_message(text_message)
 
     elif msg_type == "info":
-        print("\n[INFO] {}".format(data.get("message")))
+        print("\n {}".format(data.get("message")))
 
     elif msg_type == "error":
-        print("\n[SERVER ERROR] {}".format(data.get("message")))
+        print("\n SERVER ERROR {}".format(data.get("message")))
 
     else:
-        print("\n[DEBUG] Unknown message type: {}".format(data))
+        print("\n DEBUG Unknown message type: {}".format(data))
 
 
 def on_error(ws, error):
-    print("\n[WEBSOCKET ERROR] {}".format(error))
+    print("\n WEBSOCKET ERROR {}".format(error))
 
 
 def on_close(ws, close_status_code, close_msg):
@@ -170,18 +168,18 @@ def main():
 
  
             if current_winner is not None:
-                print("\n[INFO] Game finished. Waiting for the next round...")
+                print("\n Game finished. Waiting for the next round...")
                 time.sleep(2.0)
                 continue
 
             if current_turn is None:
-                print("\n[INFO] Waiting for opponent or for the game to start...")
+                print("\n Waiting for opponent or for the game to start...")
                 time.sleep(2.0)
                 continue
 
 
             if current_turn != my_player_id:
-                print("\n[INFO] Not your turn. Waiting for opponent move...")
+                print("\n Not your turn. Waiting for opponent move...")
                 time.sleep(2.0)
                 continue
 
@@ -207,9 +205,9 @@ def main():
                 try:
                     socket_app.send(json.dumps(payload))
                 except Exception as e:
-                    print("[ERROR] Failed to send move: {}".format(e))
+                    print("ERROR Failed to send move: {}".format(e))
             else:
-                print("[ERROR] WebSocket is not available.")
+                print("ERROR WebSocket is not available.")
 
     except KeyboardInterrupt:
         print("\n[INFO] Interrupted by user. Exiting...")
