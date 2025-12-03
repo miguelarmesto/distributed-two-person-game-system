@@ -10,6 +10,7 @@ from websocket import WebSocketApp
 GAME_RULES_WS_BASE_URL = "ws://127.0.0.1:8003/ws"
 
 
+
 current_board = [""] * 9
 current_turn = None
 current_players = []
@@ -23,8 +24,8 @@ stop_flag = False
 
 
 
-
 def print_board(board):
+    """Print the Tic-Tac-Toe board in a human-friendly way."""
 
     symbols = [cell if cell else " " for cell in board]
 
@@ -38,6 +39,7 @@ def print_board(board):
 
 
 def print_state_message(message):
+    """Print a message along with basic game state information."""
     global current_turn, my_player_id, current_winner
 
     print("\n=== GAME UPDATE ===")
@@ -45,7 +47,6 @@ def print_state_message(message):
     print_board(current_board)
 
     if current_winner is not None:
- 
         if current_winner == "draw":
             print("Result: Draw!")
         else:
@@ -65,26 +66,26 @@ def print_state_message(message):
 
 
 
-
 def on_open(ws):
+    """Called when the WebSocket connection is opened."""
     global socket_connected
     socket_connected = True
-    print("\n Connected to Game Rules Service.")
+    print("\n[INFO] Connected to Game Rules Service.")
 
 
 def on_message(ws, message):
+    """Called when a message is received from the server."""
     global current_board, current_turn, current_players, current_mark_map, current_winner
 
     try:
         data = json.loads(message)
     except json.JSONDecodeError:
-        print(" ERROR Received invalid JSON: {}".format(message))
+        print("[ERROR] Received invalid JSON: {}".format(message))
         return
 
     msg_type = data.get("type")
 
     if msg_type == "state":
-
         current_board = data.get("board", [""] * 9)
         current_turn = data.get("turn")
         current_players = data.get("players", [])
@@ -95,28 +96,30 @@ def on_message(ws, message):
         print_state_message(text_message)
 
     elif msg_type == "info":
-        print("\n {}".format(data.get("message")))
+        print("\n[INFO] {}".format(data.get("message")))
 
     elif msg_type == "error":
-        print("\n SERVER ERROR {}".format(data.get("message")))
+        print("\n[SERVER ERROR] {}".format(data.get("message")))
 
     else:
-        print("\n DEBUG Unknown message type: {}".format(data))
+        print("\n[DEBUG] Unknown message type: {}".format(data))
 
 
 def on_error(ws, error):
-    print("\n WEBSOCKET ERROR {}".format(error))
+    """Called when a WebSocket error occurs."""
+    print("\n[WEBSOCKET ERROR] {}".format(error))
 
 
 def on_close(ws, close_status_code, close_msg):
+    """Called when the WebSocket connection is closed."""
     global socket_connected
     socket_connected = False
     print("\n[INFO] WebSocket connection closed.")
 
 
 
-
 def websocket_thread(url):
+    """Run the WebSocketApp in a separate thread."""
     global socket_app, stop_flag
 
     socket_app = WebSocketApp(
@@ -127,9 +130,7 @@ def websocket_thread(url):
         on_close=on_close,
     )
 
-
     socket_app.run_forever()
-
 
     stop_flag = True
 
@@ -151,39 +152,32 @@ def main():
     ws_url = "{}/{}/{}".format(GAME_RULES_WS_BASE_URL, room_id, my_player_id)
     print("\n[INFO] Connecting to: {}".format(ws_url))
 
-
     t = threading.Thread(target=websocket_thread, args=(ws_url,), daemon=True)
     t.start()
 
-
     time.sleep(1.0)
-
 
     try:
         while not stop_flag:
             if not socket_connected:
-       
                 time.sleep(0.5)
                 continue
 
- 
             if current_winner is not None:
-                print("\n Game finished. Waiting for the next round...")
+                print("\n[INFO] Game finished. Waiting for the next round...")
                 time.sleep(2.0)
                 continue
 
             if current_turn is None:
-                print("\n Waiting for opponent or for the game to start...")
+                print("\n[INFO] Waiting for opponent or for the game to start...")
                 time.sleep(2.0)
                 continue
-
 
             if current_turn != my_player_id:
-                print("\n Not your turn. Waiting for opponent move...")
+                print("\n[INFO] Not your turn. Waiting for opponent move...")
                 time.sleep(2.0)
                 continue
 
-       
             user_input = input("\nYour turn. Enter move index (0-8) or 'q' to quit: ").strip()
 
             if user_input.lower() == "q":
@@ -199,27 +193,23 @@ def main():
                 print("Index must be between 0 and 8.")
                 continue
 
-
             if socket_app:
                 payload = {"action": "move", "index": index}
                 try:
                     socket_app.send(json.dumps(payload))
                 except Exception as e:
-                    print("ERROR Failed to send move: {}".format(e))
+                    print("[ERROR] Failed to send move: {}".format(e))
             else:
-                print("ERROR WebSocket is not available.")
+                print("[ERROR] WebSocket is not available.")
 
     except KeyboardInterrupt:
         print("\n[INFO] Interrupted by user. Exiting...")
-
 
     if socket_app:
         try:
             socket_app.close()
         except Exception:
             pass
-
-
     time.sleep(0.5)
     print("Goodbye.")
 
