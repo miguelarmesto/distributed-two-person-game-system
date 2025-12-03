@@ -1,90 +1,277 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <title>Tic-Tac-Toe WebSocket Client</title>
+  <meta charset="utf-8" />
+  <title>Tic-Tac-Toe Web Client</title>
+
   <style>
-    /* minimal styling */
-    #board { display: grid; grid-template-columns: repeat(3, 80px); gap: 10px; }
-    .cell { width:80px; height:80px; display:flex; align-items:center; justify-content:center; font-size:32px; border:1px solid #333; cursor:pointer; }
-    #log { white-space: pre-wrap; margin-top: 10px; }
+
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: 20px auto;
+    }
+
+    h1 {
+      text-align: center;
+    }
+
+   
+    #connection-form {
+      margin-bottom: 16px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+
+    input {
+      padding: 6px;
+      font-size: 14px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    button {
+      margin-top: 8px;
+      padding: 8px 12px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    #status {
+      margin-top: 10px;
+      font-size: 14px;
+      color: #333;
+    }
+
+  
+    #board {
+      margin-top: 20px;
+      display: grid;
+      grid-template-columns: repeat(3, 80px);
+      grid-template-rows: repeat(3, 80px);
+      gap: 8px;
+      justify-content: center;
+    }
+
+    .cell {
+      width: 80px;
+      height: 80px;
+      border: 1px solid #333;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .cell.disabled {
+      cursor: not-allowed;
+      color: #aaa;
+    }
   </style>
 </head>
+
 <body>
-  <h1>Tic-Tac-Toe (WebSocket)</h1>
+  <h1>Tic-Tac-Toe Web Client</h1>
 
-  <label>Room ID: <input id="room" value="PUT_ROOM_ID_HERE"/></label>
-  <label>Player ID: <input id="player" value="PUT_PLAYER_ID_HERE"/></label>
-  <button id="connect">Connect</button>
+  <div id="connection-form">
+    <label>
+      Room ID:
+      <input id="roomIdInput" placeholder="room_id from Room Service" />
+    </label>
 
-  <div id="status"></div>
+    <label>
+      Player ID:
+      <input id="playerIdInput" placeholder="player_id from User Service" />
+    </label>
+
+    <button id="connectBtn">Connect</button>
+
+    <div id="status">Not connected.</div>
+  </div>
+
   <div id="board"></div>
-  <div id="log"></div>
 
-<script>
-  let socket = null;
-  let board = ["","","","","","","","",""];
-  let myPlayer = null;
-  let myMark = null;
-  let currentTurn = null;
+  <script>
 
-  const boardEl = document.getElementById("board");
-  const statusEl = document.getElementById("status");
-  const logEl = document.getElementById("log");
+    var socket = null;
+    var currentBoard = ["", "", "", "", "", "", "", "", ""];
+    var currentTurn = null;
+    var currentWinner = null;
+    var myPlayerId = null;
 
-  function renderBoard() {
-    boardEl.innerHTML = "";
-    board.forEach((v, i) => {
-      const cell = document.createElement("div");
-      cell.className = "cell";
-      cell.textContent = v;
-      cell.onclick = () => {
-        if (!socket) return;
-        socket.send(JSON.stringify({action:"move", index: i}));
-        appendLog("Sent move " + i);
-      };
-      boardEl.appendChild(cell);
-    });
-  }
+    var WS_BASE_URL = "ws://127.0.0.1:8003/ws";
 
-  function appendLog(msg) {
-    logEl.textContent += msg + "\n";
-  }
 
-  document.getElementById("connect").onclick = () => {
-    const ROOM_ID = document.getElementById("room").value.trim();
-    const PLAYER_ID = document.getElementById("player").value.trim();
-    if (!ROOM_ID || !PLAYER_ID) { alert("Set room and player ids"); return; }
-    myPlayer = PLAYER_ID;
-    socket = new WebSocket(`ws://127.0.0.1:8003/ws/${ROOM_ID}/${PLAYER_ID}`);
+    var boardEl = document.getElementById("board");
+    var statusEl = document.getElementById("status");
+    var roomInput = document.getElementById("roomIdInput");
+    var playerInput = document.getElementById("playerIdInput");
+    var connectBtn = document.getElementById("connectBtn");
 
-    socket.onopen = () => {
-      statusEl.textContent = "Connected";
-      appendLog("Connected to game service");
-    };
-    socket.onmessage = (ev) => {
-      let data = JSON.parse(ev.data);
-      if (data.type === "state") {
-        board = data.board;
-        currentTurn = data.turn;
-        if (data.mark_map && data.mark_map[myPlayer]) myMark = data.mark_map[myPlayer];
-        renderBoard();
-        appendLog("STATE: " + data.message + " | Turn: " + data.turn);
-      } else if (data.type === "info") {
-        appendLog("INFO: " + data.message);
-      } else if (data.type === "error") {
-        appendLog("ERROR: " + data.message);
-      } else {
-        appendLog("MSG: " + JSON.stringify(data));
+
+    function updateStatus(message) {
+      statusEl.textContent = message;
+    }
+
+  
+    function renderBoard() {
+      boardEl.innerHTML = ""; 
+
+      for (var i = 0; i < 9; i++) {
+        var cell = document.createElement("div");
+        cell.className = "cell";
+        cell.textContent = currentBoard[i] || "";
+
+        var isMyTurn = (currentTurn === myPlayerId);
+        var canPlay =
+          socket &&
+          socket.readyState === WebSocket.OPEN &&
+          !currentWinner &&
+          isMyTurn &&
+          !currentBoard[i];
+
+        if (!canPlay) {
+          cell.classList.add("disabled");
+        }
+
+        cell.dataset.index = i;
+        cell.onclick = function () {
+          var index = parseInt(this.dataset.index);
+          handleCellClick(index);
+        };
+
+        boardEl.appendChild(cell);
       }
-    };
-    socket.onclose = () => {
-      statusEl.textContent = "Disconnected";
-      appendLog("Disconnected");
-    };
-  };
+    }
 
-  renderBoard();
-</script>
+
+    function handleCellClick(index) {
+      if (!socket || socket.readyState !== WebSocket.OPEN) {
+        updateStatus("Socket not connected.");
+        return;
+      }
+
+      if (currentWinner) {
+        updateStatus("Game finished. Wait for next round.");
+        return;
+      }
+
+      if (currentTurn !== myPlayerId) {
+        updateStatus("Not your turn.");
+        return;
+      }
+
+      if (currentBoard[index]) {
+        updateStatus("Cell already occupied.");
+        return;
+      }
+
+      var payload = {
+        action: "move",
+        index: index
+      };
+
+      socket.send(JSON.stringify(payload));
+    }
+
+    function showGameInfo(message) {
+      var info = message;
+
+      if (currentWinner) {
+        if (currentWinner === "draw") {
+          info += " | Result: draw.";
+        } else if (currentWinner === myPlayerId) {
+          info += " | Result: you WON!";
+        } else {
+          info += " | Result: player " + currentWinner + " won.";
+        }
+        info += " New round will start.";
+      } else {
+        if (!currentTurn) {
+          info += " | Waiting for game to start...";
+        } else if (currentTurn === myPlayerId) {
+          info += " | It is YOUR turn.";
+        } else {
+          info += " | Opponent's turn: " + currentTurn;
+        }
+      }
+
+      updateStatus(info);
+      renderBoard();
+    }
+
+
+    function connect() {
+      var roomId = roomInput.value.trim();
+      var playerId = playerInput.value.trim();
+
+      if (!roomId || !playerId) {
+        alert("Please enter both room_id and player_id.");
+        return;
+      }
+
+      myPlayerId = playerId;
+      var wsUrl = WS_BASE_URL + "/" + roomId + "/" + playerId;
+
+      updateStatus("Connecting to " + wsUrl + " ...");
+
+      socket = new WebSocket(wsUrl);
+
+      socket.onopen = function () {
+        updateStatus("Connected to Game Rules Service.");
+        renderBoard();
+      };
+
+      socket.onmessage = function (event) {
+        try {
+          var data = JSON.parse(event.data);
+          var type = data.type;
+
+          if (type === "state") {
+            currentBoard = data.board || ["", "", "", "", "", "", "", "", ""];
+            currentTurn = data.turn || null;
+            currentWinner = data.winner || null;
+
+            var msg = data.message || "State update";
+            showGameInfo(msg);
+
+          } else if (type === "info") {
+            var msgInfo = data.message || "Info";
+            updateStatus(msgInfo);
+
+          } else if (type === "error") {
+            var msgError = data.message || "Error";
+            updateStatus("Error: " + msgError);
+          } else {
+            updateStatus("Unknown message from server.");
+          }
+        } catch (e) {
+          updateStatus("Failed to parse server message.");
+        }
+      };
+
+      socket.onerror = function () {
+        updateStatus("WebSocket error.");
+      };
+
+      socket.onclose = function () {
+        updateStatus("Disconnected.");
+      };
+    }
+
+
+    connectBtn.onclick = function () {
+      connect();
+    };
+
+
+    renderBoard();
+  </script>
 </body>
 </html>
