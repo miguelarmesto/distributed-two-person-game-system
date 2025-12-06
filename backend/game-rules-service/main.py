@@ -240,7 +240,7 @@ async def handle_move(room_id: str, player_id: str, index: int):
             await broadcast_state(room_id, f"Player {winner_id} ({result}) wins!", winner=winner_id)
 
 
-            await reset_game_state(room_id)
+            asyncio.create_task(delayed_reset(room_id, delay_seconds=3))
 
 
             return
@@ -257,6 +257,16 @@ async def handle_move(room_id: str, player_id: str, index: int):
             game["turn"] = next_player
             await broadcast_state(room_id, f"Player {player_id} moved. Next: {next_player}")
 
+async def delayed_reset(room_id: str, delay_seconds: int = 3):
+    """
+    Wait `delay_seconds`, then reset the board for the room and broadcast the new empty board.
+    This ensures clients see the final board for a few seconds before the next round begins.
+    """
+    await asyncio.sleep(delay_seconds)
+
+    await reset_game_state(room_id)
+
+    await broadcast_state(room_id, "New round started.", winner=None)
 
 async def broadcast_state(room_id: str, message: str, winner: Optional[str]=None):
     """
