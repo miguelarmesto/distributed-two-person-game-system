@@ -36,6 +36,13 @@ def list_users():
         return {"message": "No users for now"}
     return user_list
 
+@app.get("/users/{user_id}", response_model=User)
+def get_user(user_id: str):
+    
+    user = users.get(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
 
 @app.get("/health")
 def health():
