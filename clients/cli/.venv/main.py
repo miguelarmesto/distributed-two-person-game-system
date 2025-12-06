@@ -165,17 +165,17 @@ def main():
 
             if current_winner is not None:
                 print("\n[INFO] Game finished. Waiting for the next round...")
-
+                time.sleep(10.0)
                 continue
 
             if current_turn is None:
                 print("\n[INFO] Waiting for opponent or for the game to start...")
-
+                time.sleep(10.0)
                 continue
 
             if current_turn != my_player_id:
                 print("\n[INFO] Not your turn. Waiting for opponent move...")
-
+                time.sleep(10.0)
                 continue
 
             user_input = input("\nYour turn. Enter move index (0-8) or 'q' to quit: ").strip()
