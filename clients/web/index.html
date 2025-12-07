@@ -99,14 +99,20 @@
 
   <script>
 
+    // ======= State variables (simple) =======
     var socket = null;
     var currentBoard = ["", "", "", "", "", "", "", "", ""];
     var currentTurn = null;
     var currentWinner = null;
     var myPlayerId = null;
 
-    var WS_BASE_URL = "ws://127.0.0.1:8003/ws";
+    // new: store current room and prevent multiple timers
+    var currentRoomId = null;
+    var endRoundTimer = null;      // timeout ID for the 10s action
+    var countdownInterval = null;  // interval ID for updating countdown
 
+    var WS_BASE_URL = "ws://127.0.0.1:8003/ws";
+    var GAME_RULES_HTTP_BASE = "http://127.0.0.1:8003";
 
     var boardEl = document.getElementById("board");
     var statusEl = document.getElementById("status");
@@ -207,6 +213,55 @@
     }
 
 
+    // ===== New: end-round flow =====
+    // When a winner/draw is received, we run this once:
+    function startEndRoundFlow() {
+      // avoid starting twice
+      if (endRoundTimer) return;
+
+      var seconds = 10;
+      updateStatus("Match finished. Returning to menu in " + seconds + "s...");
+      
+      // countdown update every second
+      countdownInterval = setInterval(function() {
+        seconds -= 1;
+        if (seconds > 0) {
+          updateStatus("Match finished. Returning to menu in " + seconds + "s...");
+        }
+      }, 1000);
+
+      // after 10 seconds do the DELETE and cleanup
+      endRoundTimer = setTimeout(function() {
+        // stop the countdown
+        clearInterval(countdownInterval);
+        countdownInterval = null;
+
+        // call DELETE /games/{room_id}
+        if (currentRoomId) {
+          var delUrl = GAME_RULES_HTTP_BASE + "/games/" + encodeURIComponent(currentRoomId);
+          // simple fetch, we don't need the response for now
+          fetch(delUrl, { method: "DELETE" }).catch(function (e) {
+            console.warn("DELETE failed:", e);
+          });
+        }
+
+        // close socket if open
+        try { if (socket) socket.close(); } catch (e) {}
+
+        // reset UI and local state, return to form
+        currentBoard = ["", "", "", "", "", "", "", "", ""];
+        currentTurn = null;
+        currentWinner = null;
+        myPlayerId = null;
+        currentRoomId = null;
+        endRoundTimer = null;
+
+        updateStatus("Not connected.");
+        renderBoard();
+      }, 10000);
+    }
+
+
     function connect() {
       var roomId = roomInput.value.trim();
       var playerId = playerInput.value.trim();
@@ -216,6 +271,8 @@
         return;
       }
 
+      // store current room so deletion can be called later
+      currentRoomId = roomId;
       myPlayerId = playerId;
       var wsUrl = WS_BASE_URL + "/" + roomId + "/" + playerId;
 
@@ -241,6 +298,11 @@
             var msg = data.message || "State update";
             showGameInfo(msg);
 
+            // if match finished, start the end-round flow
+            if (currentWinner !== null) {
+              startEndRoundFlow();
+            }
+
           } else if (type === "info") {
             var msgInfo = data.message || "Info";
             updateStatus(msgInfo);
@@ -261,6 +323,15 @@
       };
 
       socket.onclose = function () {
+        // cleanup timers if socket closes early
+        if (endRoundTimer) {
+          clearTimeout(endRoundTimer);
+          endRoundTimer = null;
+        }
+        if (countdownInterval) {
+          clearInterval(countdownInterval);
+          countdownInterval = null;
+        }
         updateStatus("Disconnected.");
       };
     }
