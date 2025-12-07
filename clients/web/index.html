@@ -109,6 +109,7 @@
     var currentRoomId = null;
     var endRoundTimer = null;      
     var countdownInterval = null;  
+    var inEndPhase = false;        
 
     var WS_BASE_URL = "ws://127.0.0.1:8003/ws";
     var GAME_RULES_HTTP_BASE = "http://127.0.0.1:8003";
@@ -134,10 +135,11 @@
         cell.textContent = currentBoard[i] || "";
 
         var isMyTurn = (currentTurn === myPlayerId);
+        var socketOpen = socket && socket.readyState === WebSocket.OPEN;
         var canPlay =
-          socket &&
-          socket.readyState === WebSocket.OPEN &&
+          socketOpen &&
           !currentWinner &&
+          !inEndPhase &&     // <-- block while showing final / countdown
           isMyTurn &&
           !currentBoard[i];
 
@@ -212,55 +214,68 @@
     }
 
 
+    // ADD: start end-round sequence (show final result 2s, then 10s countdown, then delete+reset UI)
     function startEndRoundFlow() {
+      if (inEndPhase) return;    // do not start twice
+      inEndPhase = true;
 
-      if (endRoundTimer) return;
+      // Show immediate final result (status already set by onmessage handler)
+      if (currentWinner === "draw") {
+        updateStatus("Draw! Showing final board...");
+      } else if (currentWinner === myPlayerId) {
+        updateStatus("You WON! Showing final board...");
+      } else {
+        updateStatus("Player " + currentWinner + " won. Showing final board...");
+      }
 
+      // Ensure board is rendered and clicks are blocked
+      renderBoard();
 
-      updateStatus("Match finished. Showing final result...");
-      var initialDelay = 3000;  // 3 seconds
+      // Step A: short pause so user sees final board (2 seconds)
       setTimeout(function() {
 
-        var seconds = 10;
-        updateStatus("Returning to menu in " + seconds + "s...");
+        // Step B: start 10-second countdown
+        var remaining = 10;
+        updateStatus("Returning to menu in " + remaining + "s...");
 
- 
         countdownInterval = setInterval(function() {
-          seconds -= 1;
-          if (seconds > 0) {
-            updateStatus("Returning to menu in " + seconds + "s...");
+          remaining -= 1;
+          if (remaining > 0) {
+            updateStatus("Returning to menu in " + remaining + "s...");
           }
         }, 1000);
 
- 
+        // After countdown: call DELETE, close socket, reset UI
         endRoundTimer = setTimeout(function() {
+          // cleanup countdown
           clearInterval(countdownInterval);
           countdownInterval = null;
 
-
+          // call DELETE /games/{room}
           if (currentRoomId) {
             var delUrl = GAME_RULES_HTTP_BASE + "/games/" + encodeURIComponent(currentRoomId);
-            fetch(delUrl, { method: "DELETE" }).catch(function(e){
+            fetch(delUrl, { method: "DELETE" }).catch(function (e) {
               console.warn("DELETE failed:", e);
             });
           }
 
-
+          // close socket if open
           try { if (socket) socket.close(); } catch (e) {}
 
-
-          currentBoard = ["","","","","","","","",""];
+          // reset local state and UI
+          currentBoard = ["", "", "", "", "", "", "", "", ""];
           currentTurn = null;
           currentWinner = null;
           myPlayerId = null;
           currentRoomId = null;
+          inEndPhase = false;
           endRoundTimer = null;
 
           updateStatus("Not connected.");
           renderBoard();
         }, 10000);
 
-      }, initialDelay);
+      }, 2000); // initial 2-second pause
     }
 
 
@@ -334,7 +349,7 @@
           clearInterval(countdownInterval);
           countdownInterval = null;
         }
-        updateStatus("Disconnected.");
+        inEndPhase = false;
       };
     }
 
