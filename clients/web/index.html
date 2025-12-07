@@ -214,15 +214,15 @@
     }
 
 
-    // ADD: start end-round sequence (show final result 2s, then 10s countdown, then delete+reset UI)
+    
     function startEndRoundFlow() {
-      if (inEndPhase) return;    // do not start twice
+      if (inEndPhase) return;    
       inEndPhase = true;
       connectDisabled = true;
       connectBtn.disabled = true;
       connectBtn.style.opacity = "0.5";
       connectBtn.style.cursor = "not-allowed";
-      // Show immediate final result (status already set by onmessage handler)
+      
       if (currentWinner === "draw") {
         updateStatus("Draw! Showing final board...");
       } else if (currentWinner === myPlayerId) {
@@ -231,13 +231,13 @@
         updateStatus("Player " + currentWinner + " won. Showing final board...");
       }
 
-      // Ensure board is rendered and clicks are blocked
+      
       renderBoard();
 
-      // Step A: short pause so user sees final board (2 seconds)
+      
       setTimeout(function() {
 
-        // Step B: start 10-second countdown
+        
         var remaining = 10;
         updateStatus("Returning to menu in " + remaining + "s...");
 
@@ -248,13 +248,13 @@
           }
         }, 1000);
 
-        // After countdown: call DELETE, close socket, reset UI
+        
         endRoundTimer = setTimeout(function() {
-          // cleanup countdown
+          
           clearInterval(countdownInterval);
           countdownInterval = null;
 
-          // call DELETE /games/{room}
+          
           if (currentRoomId) {
             var delUrl = GAME_RULES_HTTP_BASE + "/games/" + encodeURIComponent(currentRoomId);
             fetch(delUrl, { method: "DELETE" }).catch(function (e) {
@@ -262,10 +262,10 @@
             });
           }
 
-          // close socket if open
+          
           try { if (socket) socket.close(); } catch (e) {}
 
-          // reset local state and UI
+          
           currentBoard = ["", "", "", "", "", "", "", "", ""];
           currentTurn = null;
           currentWinner = null;
@@ -282,7 +282,7 @@
           renderBoard();
         }, 10000);
 
-      }, 2000); // initial 2-second pause
+      }, 2000); 
     }
 
 
