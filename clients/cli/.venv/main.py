@@ -195,13 +195,10 @@ def interactive_loop():
         try:
             while not stop_flag:
                 if not socket_connected:
-                    maybe_print_once("[INFO] Waiting for connection/opponent...")
-                    time.sleep(0.5)
-                    continue
+                    break
 
                 if current_winner is not None:
-                    time.sleep(0.5)
-                    continue
+                    break
 
                 if current_turn is None:
                     maybe_print_once("[INFO] Waiting for opponent or game start...")
