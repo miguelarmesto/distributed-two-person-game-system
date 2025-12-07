@@ -119,7 +119,7 @@
     var roomInput = document.getElementById("roomIdInput");
     var playerInput = document.getElementById("playerIdInput");
     var connectBtn = document.getElementById("connectBtn");
-
+    var connectDisabled = false;
 
     function updateStatus(message) {
       statusEl.textContent = message;
@@ -218,7 +218,10 @@
     function startEndRoundFlow() {
       if (inEndPhase) return;    // do not start twice
       inEndPhase = true;
-
+      connectDisabled = true;
+      connectBtn.disabled = true;
+      connectBtn.style.opacity = "0.5";
+      connectBtn.style.cursor = "not-allowed";
       // Show immediate final result (status already set by onmessage handler)
       if (currentWinner === "draw") {
         updateStatus("Draw! Showing final board...");
@@ -270,6 +273,10 @@
           currentRoomId = null;
           inEndPhase = false;
           endRoundTimer = null;
+          connectDisabled = false;
+          connectBtn.disabled = false;
+          connectBtn.style.opacity = "1";
+          connectBtn.style.cursor = "pointer";
 
           updateStatus("Not connected.");
           renderBoard();
