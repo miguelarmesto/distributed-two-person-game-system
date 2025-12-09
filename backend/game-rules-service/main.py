@@ -14,11 +14,6 @@ app = FastAPI(title="Game Rules Service (Tic-Tac-Toe)", version="0.1")
 
 
 def check_winner(board: List[str]) -> Optional[str]:
-    """
-    Check the board for a winner.
-    board is a list of 9 elements with "", "X" or "O".
-    Returns "X" or "O" if there is a winner, "draw" if board full and no winner, or None if game continues.
-    """
     lines = [
         (0,1,2), (3,4,5), (6,7,8),  
         (0,3,6), (1,4,7), (2,5,8),  
@@ -36,7 +31,7 @@ games: Dict[str, Dict] = {}
 
 
 def user_exists(user_id: str) -> bool:
-    """Checks User Service to ensure the user exists."""
+    
     try:
         r = requests.get(f"{USER_SERVICE_URL}/users/{user_id}", timeout=2)
         return r.status_code == 200
@@ -44,11 +39,6 @@ def user_exists(user_id: str) -> bool:
         return False
 
 def user_in_room(room_id: str, user_id: str) -> bool:
-    """
-    Checks Room Service GET /rooms and finds the room,
-    then verifies user_id is listed in that room's players.
-    This avoids needing a dedicated GET /rooms/{room_id} endpoint.
-    """
     try:
         r = requests.get(f"{ROOM_SERVICE_URL}/rooms", timeout=3)
         if r.status_code != 200:
@@ -67,14 +57,7 @@ def user_in_room(room_id: str, user_id: str) -> bool:
 
 @app.websocket("/ws/{room_id}/{player_id}")
 async def websocket_endpoint(websocket: WebSocket, room_id: str, player_id: str):
-    """
-    WebSocket entrypoint for players.
-    - Validates user exists and is member of the room (via Room Service).
-    - Registers the websocket in the game's state.
-    - When two players are connected, starts the game and notifies both.
-    - Accepts 'move' messages from the client like: {"action":"move","index":4}
-    - Broadcasts state updates to both players.
-    """
+
 
     await websocket.accept()
 
@@ -176,10 +159,7 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, player_id: str)
 
 @app.get("/games/{room_id}")
 def get_game_state(room_id: str):
-    """
-    Returns the current state of a Tic-Tac-Toe game by room_id.
-    Useful for debugging or external services (e.g., a scoreboard).
-    """
+
     game = games.get(room_id)
     if not game:
         raise HTTPException(status_code=404, detail="Game not found")
@@ -192,11 +172,6 @@ def get_game_state(room_id: str):
     }
 
 async def handle_move(room_id: str, player_id: str, index: int):
-    """
-    Handle a move requested by player_id at `index` (0-8).
-    Validate turn, index range, and occupancy.
-    Update board, check winner/draw, broadcast new state.
-    """
     if room_id not in games:
         return
     game = games[room_id]
@@ -258,10 +233,7 @@ async def handle_move(room_id: str, player_id: str, index: int):
             await broadcast_state(room_id, f"Player {player_id} moved. Next: {next_player}")
 
 async def delayed_reset(room_id: str, delay_seconds: int = 3):
-    """
-    Wait `delay_seconds`, then reset the board for the room and broadcast the new empty board.
-    This ensures clients see the final board for a few seconds before the next round begins.
-    """
+
     await asyncio.sleep(delay_seconds)
 
     await reset_game_state(room_id)
@@ -269,9 +241,7 @@ async def delayed_reset(room_id: str, delay_seconds: int = 3):
     await broadcast_state(room_id, "New round started.", winner=None)
 
 async def broadcast_state(room_id: str, message: str, winner: Optional[str]=None):
-    """
-    Broadcast current game state to all connected sockets in the room.
-    """
+
     game = games.get(room_id)
     if not game:
         return
@@ -295,9 +265,7 @@ async def broadcast_state(room_id: str, message: str, winner: Optional[str]=None
             pass
 
 async def notify_remaining_on_disconnect(room_id: str, disconnected_player: str):
-    """
-    Notify remaining player that opponent disconnected.
-    """
+
     game = games.get(room_id)
     if not game:
         return
@@ -309,10 +277,7 @@ async def notify_remaining_on_disconnect(room_id: str, disconnected_player: str)
                 pass
 
 async def reset_game_state(room_id: str):
-    """
-    Reset the in-memory board for a new match while keeping the same players.
-    Turn resets to the first player in list if available.
-    """
+
     game = games.get(room_id)
     if not game:
         return
@@ -325,10 +290,7 @@ async def reset_game_state(room_id: str):
 
 @app.delete("/games/{room_id}")
 def delete_game(room_id: str):
-    """
-    Completely removes the game state for a given room.
-    Used when a room is reset in Room Service, or when starting a new game.
-    """
+
     if room_id in games:
         del games[room_id]
         return {"message": "Game state cleared"}

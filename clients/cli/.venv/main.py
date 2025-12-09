@@ -130,13 +130,7 @@ def run_ws(ws_url):
 
 
 def end_round_flow(room_id):
-    """
-    When a match finishes:
-    - wait 10 seconds
-    - delete current game state
-    - close WS
-    - return to main loop to ask for new room/player id
-    """
+
     global socket_app, socket_connected, stop_flag
 
 
