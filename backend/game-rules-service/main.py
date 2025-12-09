@@ -54,14 +54,14 @@ def user_in_room(room_id: str, user_id: str) -> bool:
     except requests.RequestException:
         return False
 
-
+     # WebSocket entrypoint for players
 @app.websocket("/ws/{room_id}/{player_id}")
 async def websocket_endpoint(websocket: WebSocket, room_id: str, player_id: str):
-
+    
 
     await websocket.accept()
 
-
+    # Basic validation: user must exist and be in the room
     if not user_exists(player_id):
         await websocket.send_text(json.dumps({"type":"error","message":"User not found in User Service"}))
         await websocket.close()
@@ -72,7 +72,7 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, player_id: str)
         await websocket.close()
         return
 
-
+    # Create game state atomically per room
     if room_id not in games:
 
         games[room_id] = {
@@ -86,13 +86,13 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, player_id: str)
 
     game = games[room_id]
 
-
+    # Prevent duplicate connections for same player
     if player_id in game["sockets"]:
         await websocket.send_text(json.dumps({"type":"error","message":"Player already connected"}))
         await websocket.close()
         return
 
-
+    # Add the player to the game players list if not present
     if player_id not in game["players"]:
         game["players"].append(player_id)
 
@@ -106,8 +106,8 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, player_id: str)
         elif len(game["mark_map"]) == 1:
             game["mark_map"][player_id] = "O"
 
-
-    try:
+    # Notify and possibly start the game when we have two players connected
+    try:    
         if len(game["players"]) == 2 and len(game["sockets"]) == 2:
 
             p1, p2 = game["players"][0], game["players"][1]
@@ -141,7 +141,7 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, player_id: str)
 
     except WebSocketDisconnect:
 
-
+        # If a player disconnects, remove from sockets but keep game state for possible reconnection.
         if room_id in games:
             g = games[room_id]
             if player_id in g["sockets"]:
@@ -176,14 +176,14 @@ async def handle_move(room_id: str, player_id: str, index: int):
         return
     game = games[room_id]
     async with game["lock"]:
-
+        # validate player part of the game
         if player_id not in game["players"]:
             ws = game["sockets"].get(player_id)
             if ws:
                 await ws.send_text(json.dumps({"type":"error","message":"You are not a player in this game"}))
             return
 
-
+        # validate it's player's turn
         if game["turn"] != player_id:
             ws = game["sockets"].get(player_id)
             if ws:
@@ -203,15 +203,15 @@ async def handle_move(room_id: str, player_id: str, index: int):
         mark = game["mark_map"].get(player_id)
         game["board"][index] = mark
 
-
+        # check winner or draw
         result = check_winner(game["board"])
         if result == "X" or result == "O":
-
+            # find which player_id corresponds to this mark
             winner_id = None
             for pid, m in game["mark_map"].items():
                 if m == result:
                     winner_id = pid
-
+            # broadcast final state with winner
             await broadcast_state(room_id, f"Player {winner_id} ({result}) wins!", winner=winner_id)
 
 
@@ -240,6 +240,7 @@ async def delayed_reset(room_id: str, delay_seconds: int = 3):
 
     await broadcast_state(room_id, "New round started.", winner=None)
 
+#Broadcast current game state to all connected sockets in the room.
 async def broadcast_state(room_id: str, message: str, winner: Optional[str]=None):
 
     game = games.get(room_id)
@@ -287,7 +288,7 @@ async def reset_game_state(room_id: str):
     else:
         game["turn"] = None
 
-
+#Completely removes the game state for a given room.
 @app.delete("/games/{room_id}")
 def delete_game(room_id: str):
 

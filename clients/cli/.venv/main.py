@@ -49,7 +49,7 @@ def safe_http_delete(url):
         print(f"[HTTP ERROR] DELETE {url} -> {e}")
         return None
 
-
+# WebSocket callbacks
 def on_open(ws):
     global socket_connected, last_status_msg
     socket_connected = True
@@ -130,20 +130,21 @@ def run_ws(ws_url):
 
 
 def end_round_flow(room_id):
-
+    
+    
     global socket_app, socket_connected, stop_flag
 
-
+    #wait 10 seconds
     for i in range(10, 0, -1):
         maybe_print_once(f"[INFO] Returning to menu in {i} seconds...")
         time.sleep(1)
 
-
+    #delete current game state
     del_url = f"{GAME_RULES_HTTP_BASE}/games/{room_id}"
     print(f"[INFO] Deleting finished match: {del_url}")
     safe_http_delete(del_url)
 
-
+    #close WS
     try:
         if socket_app:
             socket_app.close()
@@ -158,12 +159,13 @@ def interactive_loop():
     global current_room_id, my_player_id, socket_app, socket_connected, stop_flag, current_winner, last_status_msg
 
     while True:
-
+        #Reset data
         current_winner = None
         last_status_msg = None
         stop_flag = False
         socket_connected = False
 
+        #Ask connection
         room = input("\nEnter room_id (or 'q' to quit): ").strip()
         if room.lower() == "q":
             print("Exiting.")

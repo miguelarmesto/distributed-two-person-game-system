@@ -113,7 +113,7 @@
 
     var WS_BASE_URL = "ws://127.0.0.1:8003/ws";
     var GAME_RULES_HTTP_BASE = "http://127.0.0.1:8003";
-
+    // Get references to HTML elements
     var boardEl = document.getElementById("board");
     var statusEl = document.getElementById("status");
     var roomInput = document.getElementById("roomIdInput");
@@ -121,11 +121,12 @@
     var connectBtn = document.getElementById("connectBtn");
     var connectDisabled = false;
 
+    // Update the text in the status area
     function updateStatus(message) {
       statusEl.textContent = message;
     }
 
-  
+    // Draw the 3x3 board using the currentBoard array
     function renderBoard() {
       boardEl.innerHTML = ""; 
 
@@ -133,7 +134,8 @@
         var cell = document.createElement("div");
         cell.className = "cell";
         cell.textContent = currentBoard[i] || "";
-
+        
+        // Check if player can play on this cell
         var isMyTurn = (currentTurn === myPlayerId);
         var socketOpen = socket && socket.readyState === WebSocket.OPEN;
         var canPlay =
@@ -146,7 +148,8 @@
         if (!canPlay) {
           cell.classList.add("disabled");
         }
-
+        
+        // Store the index on the element and attach click handler
         cell.dataset.index = i;
         cell.onclick = function () {
           var index = parseInt(this.dataset.index);
@@ -186,7 +189,7 @@
 
       socket.send(JSON.stringify(payload));
     }
-
+    // Show game information based on server state
     function showGameInfo(message) {
       var info = message;
 
@@ -214,7 +217,7 @@
     }
 
 
-    
+    // When a winner/draw is received, we run this once:
     function startEndRoundFlow() {
       if (inEndPhase) return;    
       inEndPhase = true;
@@ -223,6 +226,7 @@
       connectBtn.style.opacity = "0.5";
       connectBtn.style.cursor = "not-allowed";
       
+      // Show immediate final result
       if (currentWinner === "draw") {
         updateStatus("Draw! Showing final board...");
       } else if (currentWinner === myPlayerId) {
@@ -231,13 +235,13 @@
         updateStatus("Player " + currentWinner + " won. Showing final board...");
       }
 
-      
+      // Ensure board is rendered and clicks are blocked
       renderBoard();
 
-      
+      // Short pause so user sees final board
       setTimeout(function() {
 
-        
+        // Countdown
         var remaining = 10;
         updateStatus("Returning to menu in " + remaining + "s...");
 
@@ -248,13 +252,13 @@
           }
         }, 1000);
 
-        
+        // After countdown: call DELETE, close socket, reset UI
         endRoundTimer = setTimeout(function() {
           
           clearInterval(countdownInterval);
           countdownInterval = null;
 
-          
+          // call DELETE /games/{room}
           if (currentRoomId) {
             var delUrl = GAME_RULES_HTTP_BASE + "/games/" + encodeURIComponent(currentRoomId);
             fetch(delUrl, { method: "DELETE" }).catch(function (e) {
@@ -285,7 +289,7 @@
       }, 2000); 
     }
 
-
+    //connect and WS handlers
     function connect() {
       var roomId = roomInput.value.trim();
       var playerId = playerInput.value.trim();
