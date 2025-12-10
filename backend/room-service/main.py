@@ -86,7 +86,7 @@ def join_room(room_id: str, user_id: str):
 
 @app.post("/rooms/{room_id}/reset", response_model=Room)
 def reset_room(room_id: str):
-    """Reset room state and notify Game Rules Service to clear game state as well."""
+    
     room = rooms.get(room_id)
     if not room:
         raise HTTPException(status_code=404, detail="Room not found")
